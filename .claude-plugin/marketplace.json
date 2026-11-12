@@ -1,0 +1,13 @@
+{
+  "name": "tb-mods",
+  "owner": { "name": "Thomas Birbaum" },
+  "description": "Mods Claude Code personnels",
+  "plugins": [
+    {
+      "name": "quota-meter",
+      "source": "./plugins/quota-meter",
+      "description": "Bandeau permanent du quota Claude (fenêtre 5h et hebdo) au-dessus du prompt, alertes à 80/95 %, /quota pour basculer en status line",
+      "version": "0.2.0"
+    }
+  ]
+}

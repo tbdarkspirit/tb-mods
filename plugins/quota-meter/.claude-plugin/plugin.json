@@ -1,0 +1,1 @@
+{ "name": "quota-meter", "version": "0.2.0", "description": "Affiche en permanence l'utilisation du quota Claude (fenêtre 5h et hebdo) au-dessus du prompt (ou dans la status line via /quota)", "types": "./types/index.d.ts", "license": "MIT" }
