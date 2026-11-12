@@ -39,8 +39,16 @@ async function hub($: EngineInterface, method: string, path: string, body?: obje
   return r.text
 }
 
+let isTracked = false
+
+async function track($: EngineInterface) {
+  if (isTracked) return
+  isTracked = true
+  await report($)
+}
+
 async function report($: EngineInterface) {
-  if (!me.id) return
+  if (!me.id || !isTracked) return
   try {
     await hub($, 'PUT', `/api/sessions/${encodeURIComponent(me.id)}`, {
       machine: me.machine,
@@ -104,8 +112,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const r = await next(e)
-    // Une exécution sans écran (claude -p, scripts, tâches planifiées) ne va pas sur le radar.
-    if (e.surface === null && !e.isInteractive) return r
+    await $.command.register({ name: 'sessions', description: 'Radar des conversations Claude Code sur toutes tes machines' })
     me.id = await $.session.id()
     me.cwd = e.cwd
     const repo = await $.session.repo().catch(() => null)
@@ -117,11 +124,18 @@ export const register: Register = (on, options) => {
         me.machine = 'machine inconnue'
       }
     }
-    await $.command.register({ name: 'sessions', description: 'Radar des conversations Claude Code sur toutes tes machines' })
-    await setState($, 'idle', '')
     await poll($)
     $.clock.every(POLL_MS, () => void poll($))
     $.clock.every(HEARTBEAT_MS, () => void report($))
+    // L'app desktop et le SDK démarrent sans écran : on ne suit la session qu'une fois un écran attaché,
+    // ce qui écarte les exécutions sans écran (claude -p, scripts, tâches planifiées).
+    if (e.isInteractive || (await $.session.surfaces()).length > 0) await track($)
+    return r
+  })
+
+  on('session.attach', async ($, e, next) => {
+    const r = await next(e)
+    await track($)
     return r
   })
 
@@ -167,7 +181,7 @@ export const register: Register = (on, options) => {
 
   on('session.end', async ($, e, next) => {
     try {
-      if (me.id) await hub($, 'DELETE', `/api/sessions/${encodeURIComponent(me.id)}`)
+      if (me.id && isTracked) await hub($, 'DELETE', `/api/sessions/${encodeURIComponent(me.id)}`)
     } catch {
       // le hub l'oubliera de lui-même
     }

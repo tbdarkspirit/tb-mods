@@ -32,3 +32,24 @@ test('bandeau et panneau listent ce qui attend ailleurs', { options: { token: 't
     await band.unmount()
   }
 })
+
+test('sans écran (claude -p) : rien envoyé ; suivie dès qu’un écran s’attache', { options: { token: 't', hubUrl: 'https://hub', machine: 'vps' } }, async ($, on) => {
+  const puts: string[] = []
+  on('http.fetch', (_, e) => {
+    if (e.init?.method === 'PUT') puts.push(e.url)
+    return { value: { status: 200, ok: true, headers: {}, text: '{"sessions":[],"now":0}' } }
+  })
+  on('session.id', () => ({ value: 'headless' }))
+  on('session.repo', () => ({ value: null }))
+  on('session.surfaces', () => ({ value: [] }))
+  on('command.register', () => ({ value: { command: 'sessions' } }))
+  on('clock.every', () => ({ value: undefined }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.attach', (_, e) => ({ clientId: e.clientId }))
+
+  await $.session.start({ cwd: '/x', surface: null, isInteractive: false })
+  expect(puts.length).toBe(0)
+
+  await $.session.attach({ surface: 'desktop', clientId: 'desktop:default' } as never)
+  expect(puts.length).toBe(1)
+})
