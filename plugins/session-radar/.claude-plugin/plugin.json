@@ -1,6 +1,6 @@
 {
   "name": "session-radar",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Suit les conversations Claude Code de toutes tes machines : bandeau quand l'une attend ta réponse ailleurs, panneau /sessions avec tout ce qui tourne et où",
   "license": "MIT",
   "types": "./types/index.d.ts",

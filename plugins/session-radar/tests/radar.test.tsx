@@ -76,3 +76,21 @@ test('URL Remote Control lue dans le transcript', async () => {
   expect(remoteUrlFromTranscript('{"type":"bridge-session","bridgeSessionId":"cse_014Abc"}')).toBe('https://claude.ai/code/session_014Abc')
   expect(remoteUrlFromTranscript('{}')).toBe('')
 })
+
+import { textList } from '../hooks/format'
+
+test('liste texte pour Remote Control : liens des autres sessions, sans les muettes', async () => {
+  const base = { project: 'p', detail: '', version: '0.2.2', ageSec: 120 }
+  const out = textList(
+    [
+      { ...base, id: 'a', machine: 'PC Windows', title: 'Fix import', url: 'https://claude.ai/code/session_A', state: 'waiting', isStale: false },
+      { ...base, id: 'me', machine: 'VPS', title: 'Radar', url: 'https://claude.ai/code/session_ME', state: 'working', isStale: false },
+      { ...base, id: 'old', machine: 'PC sous-sol', title: 'Vieux', url: '', state: 'idle', isStale: true },
+    ],
+    'me',
+  )
+  expect(out).toContain('PC Windows · Fix import — attend ta réponse, 2 min\n   https://claude.ai/code/session_A')
+  expect(out).toContain('VPS · Radar (ici)')
+  expect(out).not.toContain('session_ME')
+  expect(out).not.toContain('Vieux')
+})

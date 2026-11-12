@@ -2,11 +2,11 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Radar, RadarState, Remote } from '../types'
-import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, remoteUrlFromTranscript, titleFromTranscript, where } from './format'
+import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, remoteUrlFromTranscript, textList, titleFromTranscript, where } from './format'
 
 const PANE = 'session-radar'
 /** Envoyée au hub, pour voir quelle version tourne sur chaque machine. Garder égale à plugin.json. */
-const VERSION = '0.2.1'
+const VERSION = '0.2.2'
 const POLL_MS = 20_000
 const HEARTBEAT_MS = 120_000
 /** fs.read refuse au-delà de 4 Mio ; un gros transcript garde le dernier titre lu. */
@@ -230,9 +230,12 @@ export const register: Register = (on, options) => {
       return { text: `Bandeau radar ${hidden ? 'masqué' : 'affiché'}` }
     }
     await poll($)
-    await $.ui.open({ id: PANE, title: 'Sessions' })
     const { sessions, error } = await read($, radar)
     if (error) return { text: `Radar : ${error}` }
+    // Depuis claude.ai (Remote Control), aucun panneau ne s'affiche : la liste vient en texte, avec les liens.
+    const fromRemote = e.origin.kind === 'bridge'
+    const opened = fromRemote ? null : await $.ui.open({ id: PANE, title: 'Sessions' })
+    if (fromRemote || !opened?.isPlaced) return { text: textList(sessions, me.id) }
     const waiting = sessions.filter(s => s.id !== me.id && needsMe(s)).length
     return { text: `Radar ouvert — ${sessions.length} session(s), ${waiting} en attente ailleurs` }
   })

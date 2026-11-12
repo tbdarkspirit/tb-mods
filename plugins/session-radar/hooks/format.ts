@@ -67,3 +67,15 @@ export const remoteUrlFromTranscript = (text: string) => {
   for (const m of text.matchAll(/"bridgeSessionId":"cse_([A-Za-z0-9]+)"/g)) id = m[1] ?? id
   return id ? `https://claude.ai/code/session_${id}` : ''
 }
+
+/** La liste en texte, pour un client qui n'affiche pas les panneaux (claude.ai via Remote Control). */
+export const textList = (sessions: readonly Remote[], selfId: string) => {
+  const list = sortRemotes(sessions.filter(s => !s.isStale))
+  if (list.length === 0) return 'Aucune session active.'
+  return list
+    .map(s => {
+      const head = `${ICON[s.state]} ${s.machine} · ${s.title || s.project || '?'}${s.id === selfId ? ' (ici)' : ''} — ${LABEL[s.state]}, ${ago(s.ageSec)}`
+      return s.url && s.id !== selfId ? `${head}\n   ${s.url}` : head
+    })
+    .join('\n')
+}
