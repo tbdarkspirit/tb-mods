@@ -10,12 +10,6 @@
       "source": "./plugins/quota-meter",
       "description": "Bandeau permanent du quota Claude (fenêtre 5h et hebdo) au-dessus du prompt, alertes à 80/95 %, /quota pour basculer en status line",
       "version": "0.2.0"
-    },
-    {
-      "name": "session-radar",
-      "source": "./plugins/session-radar",
-      "description": "Radar des conversations Claude Code sur toutes tes machines : bandeau quand l'une attend ta réponse ailleurs, panneau /sessions, notifications",
-      "version": "0.2.2"
     }
   ]
 }
