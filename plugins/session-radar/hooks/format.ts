@@ -60,3 +60,10 @@ export const titleFromTranscript = (text: string) => {
   const ai = last(/"aiTitle":"((?:[^"\\]|\\.)*)"/g)
   return decode(custom || ai).trim()
 }
+
+/** L'URL claude.ai de la session quand Remote Control est actif : bridgeSessionId cse_X -> claude.ai/code/session_X. */
+export const remoteUrlFromTranscript = (text: string) => {
+  let id = ''
+  for (const m of text.matchAll(/"bridgeSessionId":"cse_([A-Za-z0-9]+)"/g)) id = m[1] ?? id
+  return id ? `https://claude.ai/code/session_${id}` : ''
+}

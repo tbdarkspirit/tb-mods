@@ -4,7 +4,7 @@ const HUB = JSON.stringify({
   now: 1000,
   sessions: [
     { id: 'self', machine: 'vps', project: 'apps', state: 'working', stateSince: 990, isStale: false },
-    { id: 'w1', machine: 'PC Windows', project: 'ma-cave', title: 'fix import', state: 'waiting', stateSince: 700, isStale: false },
+    { id: 'w1', machine: 'PC Windows', project: 'ma-cave', title: 'fix import', url: 'https://claude.ai/code/session_W1', state: 'waiting', stateSince: 700, isStale: false },
     { id: 's1', machine: 'PC sous-sol', project: 'old', state: 'waiting', stateSince: 0, isStale: true },
   ],
 })
@@ -30,6 +30,11 @@ test('bandeau et panneau listent ce qui attend ailleurs', { options: { token: 't
     expect((await band.find({ type: 'Text', text: /ma-cave/ }))?.text).toContain('PC Windows')
     expect(await band.find({ type: 'Text', text: /old/ })).toBeUndefined()
     await band.unmount()
+
+    const pane = await $.ui.mount({ plugin: 'session-radar', component: 'Pane', requestId: 'session-radar', surface, props: { title: 'Sessions', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 20 }, view: {} } } as never)
+    const link = await pane.find({ type: 'Link' })
+    expect((link?.props as { href?: string } | undefined)?.href).toBe('https://claude.ai/code/session_W1')
+    await pane.unmount()
   }
 })
 
@@ -54,7 +59,7 @@ test('sans écran (claude -p) : rien envoyé ; suivie dès qu’un écran s’at
   expect(puts.length).toBe(1)
 })
 
-import { titleFromTranscript } from '../hooks/format'
+import { remoteUrlFromTranscript, titleFromTranscript } from '../hooks/format'
 
 test('titre lu dans le transcript : renommage > titre généré', async () => {
   const t = [
@@ -65,4 +70,9 @@ test('titre lu dans le transcript : renommage > titre généré', async () => {
   expect(titleFromTranscript(t)).toBe('Mon "radar"')
   expect(titleFromTranscript('{"type":"ai-title","aiTitle":"Seul"}')).toBe('Seul')
   expect(titleFromTranscript('{}')).toBe('')
+})
+
+test('URL Remote Control lue dans le transcript', async () => {
+  expect(remoteUrlFromTranscript('{"type":"bridge-session","bridgeSessionId":"cse_014Abc"}')).toBe('https://claude.ai/code/session_014Abc')
+  expect(remoteUrlFromTranscript('{}')).toBe('')
 })

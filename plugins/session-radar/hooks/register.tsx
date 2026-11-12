@@ -2,12 +2,11 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Radar, RadarState, Remote } from '../types'
-import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, titleFromTranscript, where } from './format'
+import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, remoteUrlFromTranscript, titleFromTranscript, where } from './format'
 
 const PANE = 'session-radar'
 const POLL_MS = 20_000
 const HEARTBEAT_MS = 120_000
-const PERMISSION_DELAY_MS = 4_000
 /** fs.read refuse au-delà de 4 Mio ; un gros transcript garde le dernier titre lu. */
 const MAX_TRANSCRIPT_BYTES = 4 * 1024 * 1024
 
@@ -17,12 +16,11 @@ const radar = atom({ plugin: 'session-radar', key: 'radar' } as const, { session
 const isBandHidden = atom({ plugin: 'session-radar', key: 'isBandHidden' } as const, false)
 
 /** This session, as reported to the hub. */
-const me = { id: '', machine: '', project: '', title: '', cwd: '', detail: '', state: 'idle' as RadarState }
+const me = { id: '', machine: '', project: '', title: '', cwd: '', detail: '', url: '', state: 'idle' as RadarState }
 const cfg = { url: '', token: '' }
 /** Sessions already announced as waiting, so each wait is toasted once. */
 const announced = new Set<string>()
 let isFirstPoll = true
-let permissionTimer: { cancel: () => void } | null = null
 
 function configure(options: PluginOptions) {
   cfg.url = String(options.hubUrl ?? '').replace(/\/+$/, '')
@@ -53,7 +51,9 @@ async function refreshTitle($: EngineInterface) {
     const st = await $.fs.stat(transcriptPath)
     if (st.size === transcriptSize || st.size > MAX_TRANSCRIPT_BYTES) return
     transcriptSize = st.size
-    const title = titleFromTranscript(await $.fs.read(transcriptPath))
+    const text = await $.fs.read(transcriptPath)
+    me.url = remoteUrlFromTranscript(text) || me.url
+    const title = titleFromTranscript(text)
     if (title) {
       hasTranscriptTitle = true
       me.title = clip(title, 120)
@@ -79,6 +79,7 @@ async function report($: EngineInterface) {
       title: me.title,
       cwd: me.cwd,
       detail: me.detail,
+      url: me.url,
       state: me.state,
     })
   } catch {
@@ -87,8 +88,6 @@ async function report($: EngineInterface) {
 }
 
 async function setState($: EngineInterface, state: RadarState, detail?: string) {
-  permissionTimer?.cancel()
-  permissionTimer = null
   me.state = state
   if (detail !== undefined) me.detail = clip(detail, 160)
   await report($)
@@ -104,6 +103,7 @@ async function poll($: EngineInterface) {
       project: String(s.project || ''),
       title: String(s.title || ''),
       detail: String(s.detail || ''),
+      url: String(s.url || ''),
       state: (['working', 'waiting', 'permission', 'idle'].includes(String(s.state)) ? s.state : 'idle') as RadarState,
       ageSec: Math.max(0, data.now - Number(s.stateSince ?? data.now)),
       isStale: Boolean(s.isStale),
@@ -186,28 +186,27 @@ export const register: Register = (on, options) => {
     return r
   })
 
-  // Une autorisation demandée : signalée seulement si elle attend encore après quelques secondes
-  // (en mode auto, la plupart sont réglées tout de suite).
-  on('tool.check', async ($, e, next) => {
-    const r = await next(e)
-    if (r.decision === 'ask' && me.state === 'working') {
-      permissionTimer?.cancel()
-      const tool = e.tool
-      permissionTimer = $.clock.after(PERMISSION_DELAY_MS, () => {
-        permissionTimer = null
-        if (me.state !== 'working') return
-        me.state = 'permission'
-        me.detail = `autorisation : ${tool}`
-        void report($)
-      })
+  // Une autorisation réellement demandée à toi : le mode auto et les règles ont déjà tranché avant.
+  on('classic.PermissionRequest', async ($, e, next) => {
+    if (me.state === 'working') {
+      me.state = 'permission'
+      me.detail = `autorisation : ${e.tool_name}`
+      void report($)
     }
-    return r
+    return next(e)
+  })
+
+  on('classic.Notification', async ($, e, next) => {
+    if (e.notification_type === 'permission_prompt' && me.state === 'working') {
+      me.state = 'permission'
+      me.detail = clip(e.message || 'autorisation demandée', 160)
+      void report($)
+    }
+    return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
     const r = await next(e)
-    permissionTimer?.cancel()
-    permissionTimer = null
     if (me.state === 'permission') await setState($, 'working', `${e.tool}`)
     return r
   })
@@ -260,7 +259,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Link, Text } = $.ui.resolve(e)
     const { sessions, error, selfId } = await read($, radar)
     const width = Math.max(30, e.props.bodyColumns ?? 60)
     const machines = [...new Set(sortRemotes(sessions).map(s => s.machine))]
@@ -276,16 +275,20 @@ export const register: Register = (on, options) => {
               <Box key={s.id} flexDirection="column">
                 <Box flexDirection="row" gap={1}>
                   <Text color={s.isStale ? 'subtle' : COLOR[s.state]}>{ICON[s.state]}</Text>
-                  <Text bold={needsMe(s)} dimColor={s.isStale}>
-                    {clip(`${s.project || '?'}${s.id === selfId ? ' (ici)' : ''}`, Math.floor(width / 2))}
-                  </Text>
+                  {s.url && s.id !== selfId ? (
+                    <Text bold={needsMe(s)} dimColor={s.isStale}>
+                      <Link href={s.url}>{clip(s.title || s.project || '?', Math.floor(width / 2))}</Link>
+                    </Text>
+                  ) : (
+                    <Text bold={needsMe(s)} dimColor={s.isStale}>
+                      {clip(`${s.title || s.project || '?'}${s.id === selfId ? ' (ici)' : ''}`, Math.floor(width / 2))}
+                    </Text>
+                  )}
                   <Text dimColor>
                     {s.isStale ? `plus de signal · ${ago(s.ageSec)}` : `${LABEL[s.state]} · ${ago(s.ageSec)}`}
                   </Text>
                 </Box>
-                {(s.title || s.detail) && (
-                  <Text dimColor>{`   ${clip(s.state === 'waiting' && s.detail ? s.detail : s.title || s.detail, width - 4)}`}</Text>
-                )}
+                <Text dimColor>{`   ${clip([s.project, s.detail].filter(Boolean).join(' — '), width - 4)}`}</Text>
               </Box>
             ))}
           </Box>

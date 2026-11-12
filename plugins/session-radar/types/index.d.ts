@@ -7,6 +7,8 @@ export type Remote = {
   project: string
   title: string
   detail: string
+  /** claude.ai URL when Remote Control is on, else '' */
+  url: string
   state: RadarState
   /** seconds in the current state, at the last poll */
   ageSec: number
