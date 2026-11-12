@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 TOKEN = os.environ["HUB_TOKEN"]
 DATA = os.environ.get("HUB_DATA", "/data/sessions.json")
 STALE_AFTER = 6 * 60        # no heartbeat for 6 min -> shown as "plus de signal"
-DROP_AFTER = 24 * 3600      # forgotten after 24 h of silence
+DROP_AFTER = 30 * 60        # forgotten after 30 min of silence
 STATES = {"working", "waiting", "permission", "idle"}
 ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 FIELDS = {"machine": 64, "project": 120, "title": 200, "cwd": 300, "detail": 200, "surface": 32, "url": 200, "version": 16}
