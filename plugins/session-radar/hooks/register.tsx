@@ -5,6 +5,8 @@ import type { Radar, RadarState, Remote } from '../types'
 import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, remoteUrlFromTranscript, titleFromTranscript, where } from './format'
 
 const PANE = 'session-radar'
+/** Envoyée au hub, pour voir quelle version tourne sur chaque machine. Garder égale à plugin.json. */
+const VERSION = '0.2.1'
 const POLL_MS = 20_000
 const HEARTBEAT_MS = 120_000
 /** fs.read refuse au-delà de 4 Mio ; un gros transcript garde le dernier titre lu. */
@@ -80,6 +82,7 @@ async function report($: EngineInterface) {
       cwd: me.cwd,
       detail: me.detail,
       url: me.url,
+      version: VERSION,
       state: me.state,
     })
   } catch {
@@ -104,6 +107,7 @@ async function poll($: EngineInterface) {
       title: String(s.title || ''),
       detail: String(s.detail || ''),
       url: String(s.url || ''),
+      version: String(s.version || ''),
       state: (['working', 'waiting', 'permission', 'idle'].includes(String(s.state)) ? s.state : 'idle') as RadarState,
       ageSec: Math.max(0, data.now - Number(s.stateSince ?? data.now)),
       isStale: Boolean(s.isStale),
@@ -270,7 +274,10 @@ export const register: Register = (on, options) => {
         {sessions.length === 0 && !error && <Text dimColor>Aucune session connue.</Text>}
         {machines.map(m => (
           <Box key={`m-${m}`} flexDirection="column">
-            <Text bold>{m}</Text>
+            <Box flexDirection="row" gap={1}>
+              <Text bold>{m}</Text>
+              <Text dimColor>{`v${sessions.find(s => s.machine === m)?.version || '?'}`}</Text>
+            </Box>
             {sortRemotes(sessions.filter(s => s.machine === m)).map(s => (
               <Box key={s.id} flexDirection="column">
                 <Box flexDirection="row" gap={1}>

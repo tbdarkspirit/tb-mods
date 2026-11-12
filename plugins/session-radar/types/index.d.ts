@@ -9,6 +9,8 @@ export type Remote = {
   detail: string
   /** claude.ai URL when Remote Control is on, else '' */
   url: string
+  /** mod version on that machine */
+  version: string
   state: RadarState
   /** seconds in the current state, at the last poll */
   ageSec: number

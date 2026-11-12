@@ -15,7 +15,7 @@ STALE_AFTER = 6 * 60        # no heartbeat for 6 min -> shown as "plus de signal
 DROP_AFTER = 24 * 3600      # forgotten after 24 h of silence
 STATES = {"working", "waiting", "permission", "idle"}
 ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
-FIELDS = {"machine": 64, "project": 120, "title": 200, "cwd": 300, "detail": 200, "surface": 32, "url": 200}
+FIELDS = {"machine": 64, "project": 120, "title": 200, "cwd": 300, "detail": 200, "surface": 32, "url": 200, "version": 16}
 
 lock = threading.Lock()
 sessions: dict[str, dict] = {}
