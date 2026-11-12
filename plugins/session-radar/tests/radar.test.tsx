@@ -53,3 +53,16 @@ test('sans écran (claude -p) : rien envoyé ; suivie dès qu’un écran s’at
   await $.session.attach({ surface: 'desktop', clientId: 'desktop:default' } as never)
   expect(puts.length).toBe(1)
 })
+
+import { titleFromTranscript } from '../hooks/format'
+
+test('titre lu dans le transcript : renommage > titre généré', async () => {
+  const t = [
+    '{"type":"ai-title","aiTitle":"Titre généré","sessionId":"x"}',
+    '{"type":"user","message":"bla"}',
+    '{"type":"custom-title","customTitle":"Mon \\"radar\\"","sessionId":"x"}',
+  ].join('\n')
+  expect(titleFromTranscript(t)).toBe('Mon "radar"')
+  expect(titleFromTranscript('{"type":"ai-title","aiTitle":"Seul"}')).toBe('Seul')
+  expect(titleFromTranscript('{}')).toBe('')
+})

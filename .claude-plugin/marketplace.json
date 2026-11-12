@@ -15,7 +15,7 @@
       "name": "session-radar",
       "source": "./plugins/session-radar",
       "description": "Radar des conversations Claude Code sur toutes tes machines : bandeau quand l'une attend ta réponse ailleurs, panneau /sessions, notifications",
-      "version": "0.1.1"
+      "version": "0.1.2"
     }
   ]
 }

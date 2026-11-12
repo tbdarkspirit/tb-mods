@@ -2,12 +2,14 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Radar, RadarState, Remote } from '../types'
-import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, where } from './format'
+import { COLOR, ICON, LABEL, ago, baseName, clip, firstLine, needsMe, sortRemotes, titleFromTranscript, where } from './format'
 
 const PANE = 'session-radar'
 const POLL_MS = 20_000
 const HEARTBEAT_MS = 120_000
 const PERMISSION_DELAY_MS = 4_000
+/** fs.read refuse au-delà de 4 Mio ; un gros transcript garde le dernier titre lu. */
+const MAX_TRANSCRIPT_BYTES = 4 * 1024 * 1024
 
 const radar = atom({ plugin: 'session-radar', key: 'radar' } as const, { sessions: [], error: null, selfId: '' } as Radar, {
   shape: 'radar-1',
@@ -40,6 +42,27 @@ async function hub($: EngineInterface, method: string, path: string, body?: obje
 }
 
 let isTracked = false
+let transcriptPath = ''
+let transcriptSize = -1
+let hasTranscriptTitle = false
+
+/** Le titre que l'app donne à la conversation (renommage, sinon titre généré), lu dans le transcript. */
+async function refreshTitle($: EngineInterface) {
+  if (!transcriptPath) return
+  try {
+    const st = await $.fs.stat(transcriptPath)
+    if (st.size === transcriptSize || st.size > MAX_TRANSCRIPT_BYTES) return
+    transcriptSize = st.size
+    const title = titleFromTranscript(await $.fs.read(transcriptPath))
+    if (title) {
+      hasTranscriptTitle = true
+      me.title = clip(title, 120)
+    }
+  } catch {
+    // pas de transcript lisible : on garde le premier message comme titre
+  }
+}
+
 
 async function track($: EngineInterface) {
   if (isTracked) return
@@ -139,15 +162,25 @@ export const register: Register = (on, options) => {
     return r
   })
 
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    if (e.transcript_path && !transcriptPath) {
+      transcriptPath = e.transcript_path
+      await refreshTitle($)
+    }
+    return next(e)
+  })
+
   on('prompt.submit', async ($, e, next) => {
     const r = await next(e)
     if (!me.title && !e.text.startsWith('/')) me.title = clip(firstLine(e.text), 120)
+    await refreshTitle($)
     await setState($, 'working', firstLine(e.text))
     return r
   })
 
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
+    await refreshTitle($)
     if (e.isAborted) await setState($, 'idle', 'interrompue')
     else await setState($, 'waiting', firstLine(e.answer))
     return r

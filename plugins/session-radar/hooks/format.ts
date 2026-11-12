@@ -41,3 +41,22 @@ export const baseName = (path: string) => path.split(/[\\/]/).filter(Boolean).po
 
 export const firstLine = (text: string) =>
   text.split('\n').map(l => l.replace(/[#*`>_]/g, '').trim()).find(l => l.length > 0) ?? ''
+
+/** Le dernier titre posé dans un transcript : un renommage (custom-title) l'emporte sur le titre généré (ai-title). */
+export const titleFromTranscript = (text: string) => {
+  const last = (re: RegExp) => {
+    let found = ''
+    for (const m of text.matchAll(re)) found = m[1] ?? found
+    return found
+  }
+  const decode = (raw: string) => {
+    try {
+      return JSON.parse(`"${raw}"`) as string
+    } catch {
+      return raw
+    }
+  }
+  const custom = last(/"customTitle":"((?:[^"\\]|\\.)*)"/g)
+  const ai = last(/"aiTitle":"((?:[^"\\]|\\.)*)"/g)
+  return decode(custom || ai).trim()
+}
